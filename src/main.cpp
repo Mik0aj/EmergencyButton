@@ -4,8 +4,11 @@
 #include <ButtonSubject.cpp>
 #include <Preferences.h>
 #include <esp_random.h>
+
 #define CHUNK_SIZE 16
 #define DISPLAY_TIMEOUT 5000
+String machineList[] = {"Mid 12", "Mid 7", "Kamery", "Radary"};
+String reasonList[] = {"IPTE przyjechalo", "ITAC", "blad skrecania", "bezpiecznik wyskoczyl","zainstalowano McAfee"};
 
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 Preferences preferences;
@@ -13,14 +16,6 @@ Preferences preferences;
 auto pin = 23;
 auto currentTime = 0;
 const int DEBOUNCE = 10;
-Button *button;
-LCDObserver *lcdObserve;
-SerialObserver *serialObserve;
-String machineList[] = {"Mid 12", "Mid 7", "Kamery", "Radary"};
-String reasonList[] = {"IPTE przyjechalo", "ITAC", "blad skrecania", "bezpiecznik wyskoczyl","zainstalowano McAfee","brak wartosci dodanej"};
-
-SpecificMessageGenerator messageGenerator(machineList, sizeof(machineList) / sizeof(machineList[0]), reasonList, sizeof(reasonList) / sizeof(reasonList[0]));
-
 bool currentButtonState;
 unsigned long backlightStartTime = 0;
 
@@ -65,7 +60,7 @@ public:
     Serial.println("Button: Begin preferences"); // Debug message
 
     preferences->begin("EmergencyButton", false); // Call begin here
-    pressCount = preferences->getInt("pressCount", 0); 
+    pressCount = preferences->getInt("pressCount", pressCount); 
   }
 
     ~Button() {
@@ -198,6 +193,11 @@ public:
 
 };
 
+Button *button;
+LCDObserver *lcdObserve;
+SerialObserver *serialObserve;
+SpecificMessageGenerator messageGenerator(machineList, sizeof(machineList) / sizeof(machineList[0]), reasonList, sizeof(reasonList) / sizeof(reasonList[0]));
+
 void setup() {
   Wire.begin(); 
   pinMode(pin, INPUT_PULLUP); 
@@ -209,7 +209,6 @@ void setup() {
   lcd.backlight(); 
   lcd.setCursor(0, 0);
   lcd.print("EmergencyButton");
-  delay(500);
   currentButtonState = digitalRead(pin) ; 
   backlightStartTime = millis(); 
 }
