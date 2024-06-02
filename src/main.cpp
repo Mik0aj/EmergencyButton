@@ -6,8 +6,23 @@
 #include <esp_random.h>
 #define CHUNK_SIZE 16
 #define DISPLAY_TIMEOUT 5000
+
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 Preferences preferences;
+
+auto pin = 23;
+auto currentTime = 0;
+const int DEBOUNCE = 10;
+Button *button;
+LCDObserver *lcdObserve;
+SerialObserver *serialObserve;
+String machineList[] = {"Mid 12", "Mid 7", "Kamery", "Radary"};
+String reasonList[] = {"IPTE przyjechalo", "ITAC", "blad skrecania", "bezpiecznik wyskoczyl","zainstalowano McAfee","brak wartosci dodanej"};
+
+SpecificMessageGenerator messageGenerator(machineList, sizeof(machineList) / sizeof(machineList[0]), reasonList, sizeof(reasonList) / sizeof(reasonList[0]));
+
+bool currentButtonState;
+unsigned long backlightStartTime = 0;
 
 class GenerateMessage {
 public:
@@ -85,13 +100,12 @@ class LCDObserver : public Observer {
 private:
     LiquidCrystal_I2C* lcd;
     Button* button;
-    int lastBacklightOnTime;
     GenerateMessage* messageGenerator; 
-
+    int lastBacklightOnTime;
 
 public:
     LCDObserver(LiquidCrystal_I2C* lcd, Button* button, GenerateMessage* messageGenerator) :
-        lcd(lcd), button(button), lastBacklightOnTime(millis()), messageGenerator(messageGenerator) {
+        lcd(lcd), button(button), messageGenerator(messageGenerator), lastBacklightOnTime(millis()) {
         button->subscribe(this); // Subscribe this observer to the button
     }
 
@@ -100,95 +114,64 @@ public:
     }
 
     void update() override {
-        // Update logic here, e.g., displaying the button state on the LCD
         lcd->backlight(); 
         lastBacklightOnTime = millis();
         lcd->clear();
         lcd->setCursor(0, 0);
         
         if (button->getCurrentButtonState()) {
-            String message = messageGenerator->getMessage();
-            int chunkCount = 0;
-            int maxChunks = (message.length() + CHUNK_SIZE - 1) / CHUNK_SIZE;
-            String* chunks = new String[maxChunks];
-            splitStringIntoChunks(message, chunks, &chunkCount);
-            
-            for (int i = 0; i < chunkCount; i += 2) {
-                lcd->clear();  // Clear the display before printing new lines
-                lcd->setCursor(0, 0);
-                lcd->print(chunks[i]);
-                
-                if (i + 1 < chunkCount) {
-                    lcd->setCursor(0, 1);  // Correctly setting cursor for second line
-                    lcd->print(chunks[i + 1]);
-                }
-                
-                delay(DISPLAY_TIMEOUT / chunkCount);
-            }
-            
-            delete[] chunks;
+            displayMessage(messageGenerator->getMessage());
         } else {
-            auto pressCount=button->getPressCount();
-            if (pressCount==10 || pressCount==25 || pressCount==50 || pressCount%100==0){
-                String message = "Gratulacje z okzaji " + String(pressCount) + " awarii";
-                int chunkCount = 0;
-                int maxChunks = (message.length() + CHUNK_SIZE - 1) / CHUNK_SIZE;
-                String* chunks = new String[maxChunks];
-                splitStringIntoChunks(message, chunks, &chunkCount);
-                for (int i = 0; i < chunkCount; i += 2) {
-                    lcd->clear();  // Clear the display before printing new lines
-                    lcd->setCursor(0, 0);
-                    lcd->print(chunks[i]);
-                    
-                    if (i + 1 < chunkCount) {
-                        lcd->setCursor(0, 1);  // Correctly setting cursor for second line
-                        lcd->print(chunks[i + 1]);
-                    }
-                    
-                    delay(DISPLAY_TIMEOUT / chunkCount);
-                }
-            }
-            else{
-                String message = "Odnotowano " + String(pressCount) + " awarii";
-                int chunkCount = 0;
-                int maxChunks = (message.length() + CHUNK_SIZE - 1) / CHUNK_SIZE;
-                String* chunks = new String[maxChunks];
-                splitStringIntoChunks(message, chunks, &chunkCount);
-
-                for (int i = 0; i < chunkCount; i += 2) {
-                    lcd->clear();  // Clear the display before printing new lines
-                    lcd->setCursor(0, 0);
-                    lcd->print(chunks[i]);
-                    
-                    if (i + 1 < chunkCount) {
-                        lcd->setCursor(0, 1);  // Correctly setting cursor for second line
-                        lcd->print(chunks[i + 1]);
-                    }
-                    
-                    delay(DISPLAY_TIMEOUT / chunkCount);
-                }
+            int pressCount = button->getPressCount();
+            if (isMilestone(pressCount)) {
+                displayMessage("Gratulacje z okzaji " + String(pressCount) + " awarii");
+            } else {
+                displayMessage("Odnotowano " + String(pressCount) + " awarii");
             }
         }
     }
+
+    int getLastBacklightOnTime() const {
+        return lastBacklightOnTime;
+    }
+
+private:
     void splitStringIntoChunks(const String& str, String* chunks, int* chunkCount) {
-            // Calculate the length of the input string
-            int strLen = str.length();
+        int strLen = str.length();
+        *chunkCount = (strLen + CHUNK_SIZE - 1) / CHUNK_SIZE;
 
-            // Calculate the number of chunks needed
-            *chunkCount = (strLen + CHUNK_SIZE - 1) / CHUNK_SIZE;
-
-            // Split the string into chunks
-            for (int i = 0; i < *chunkCount; ++i) {
-                chunks[i] = str.substring(i * CHUNK_SIZE, i * CHUNK_SIZE + CHUNK_SIZE);
-            }
+        for (int i = 0; i < *chunkCount; ++i) {
+            chunks[i] = str.substring(i * CHUNK_SIZE, i * CHUNK_SIZE + CHUNK_SIZE);
         }
+    }
 
-    int getlastBacklightOnTime(){
-      return lastBacklightOnTime;
+    bool isMilestone(int pressCount) {
+        return pressCount == 10 || pressCount == 25 || pressCount == 50 || pressCount % 100 == 0;
+    }
+
+    void displayMessage(const String& message) {
+        int chunkCount = 0;
+        int maxChunks = (message.length() + CHUNK_SIZE - 1) / CHUNK_SIZE;
+        String* chunks = new String[maxChunks];
+
+        splitStringIntoChunks(message, chunks, &chunkCount);
+        
+        for (int i = 0; i < chunkCount; i += 2) {
+            lcd->clear();  // Clear the display before printing new lines
+            lcd->setCursor(0, 0);
+            lcd->print(chunks[i]);
+            
+            if (i + 1 < chunkCount) {
+                lcd->setCursor(0, 1);
+                lcd->print(chunks[i + 1]);
+            }
+            
+            delay(DISPLAY_TIMEOUT / chunkCount);
+        }
+        
+        delete[] chunks;
     }
 };
-
-
 
 class SerialObserver : public Observer {
 private:
@@ -215,20 +198,6 @@ public:
 
 };
 
-auto pin = 23;
-auto currentTime = 0;
-const int DEBOUNCE = 10;
-Button *button;
-LCDObserver *lcdObserve;
-SerialObserver *serialObserve;
-String machineList[] = {"Mid 12", "Mid 7", "Kamery", "Radary"};
-String reasonList[] = {"IPTE przyjechalo", "ITAC", "blad skrecania", "bezpiecznik wyskoczyl","zainstalowano McAfee","brak wartości dodanej"};
-
-SpecificMessageGenerator messageGenerator(machineList, sizeof(machineList) / sizeof(machineList[0]), reasonList, sizeof(reasonList) / sizeof(reasonList[0]));
-
-bool currentButtonState;
-unsigned long backlightStartTime = 0;
-
 void setup() {
   Wire.begin(); 
   pinMode(pin, INPUT_PULLUP); 
@@ -248,7 +217,7 @@ void setup() {
 void loop() {
   currentTime = millis(); 
   button->checkState(digitalRead(pin));
-  if (millis() - lcdObserve->getlastBacklightOnTime() >= DISPLAY_TIMEOUT) {
+  if (millis() - lcdObserve->getLastBacklightOnTime() >= DISPLAY_TIMEOUT) {
     lcd.clear();
     lcd.noBacklight(); 
   }
