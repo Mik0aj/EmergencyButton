@@ -1,6 +1,5 @@
-#ifndef BUTTON_STATE
-#define BUTTON_STATE
-
+#ifndef SUBJECT
+#define SUBJECT
 #include <Arduino.h>
 #include <LinkedList.cpp>
 #include <Observer.cpp>
@@ -17,13 +16,19 @@ public:
         observers.remove(obs);
     }
 
-    void notifyAll() {
+    void notifyPressed() {
         for (auto& obs : observers) {
-            obs->update();
+            obs->notifyPressed();
+        }
+    }
+
+    void notifyReleased() {
+        for (auto& obs : observers) {
+            obs->notifyReleased();
         }
     }
 };
 
 
 
-#endif /* BUTTON_STATE */
+#endif /* SUBJECT */
