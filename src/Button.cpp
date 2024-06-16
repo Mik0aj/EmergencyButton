@@ -27,20 +27,26 @@ public:
 
     void checkState(bool incomingState) {
         unsigned long currentTime = millis();
-        lastButtonState = currentButtonState;
-        currentButtonState = incomingState;
+        
+        if (incomingState != lastButtonState) {
+            lastDebounceTime = currentTime;
+        }
+        
         if ((currentTime - lastDebounceTime) > debounceTime) {
-            if (currentButtonState != lastButtonState){
-                lastDebounceTime = currentTime; 
+            if (incomingState != currentButtonState) {
+                currentButtonState = incomingState;
+
                 if (currentButtonState == HIGH) {
-                    pressCount++; 
+                    pressCount++;
                     preferences->putInt("pressCount", pressCount);
-                    notifyPressed(); 
+                    notifyPressed();
                 } else {
-                    notifyReleased(); 
+                    notifyReleased();
                 }
             }
         }
+        
+        lastButtonState = incomingState;
     }
 
     bool getCurrentButtonState() {

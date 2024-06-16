@@ -16,7 +16,7 @@ Preferences preferences;
 
 auto pin = 23;
 auto currentTime = 0;
-const int DEBOUNCE = 15;
+const int DEBOUNCE = 50;
 bool currentButtonState;
 unsigned long backlightStartTime = 0;
 

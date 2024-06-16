@@ -40,18 +40,15 @@ public:
         lcd->clear();
         lcd->setCursor(0, 0);
         auto message = messageGenerator->getMessage();
-        Serial.println(message);
         updateChunks(message);
     }
 
     void notifyReleased() override {
         lcd->backlight(); 
         timeWhenBaclightWasTriggered = millis();
-
         lcd->clear();
         lcd->setCursor(0, 0);
         int pressCount = button->getPressCount();
-        Serial.println(pressCount);
         String message;
         if (isMilestone(pressCount)) {
             message = "Gratulacje z okzaji " + String(pressCount) + " awarii";
@@ -112,7 +109,8 @@ private:
     }
 
     bool isMilestone(int pressCount) {
-        return pressCount == 10 || pressCount == 25 || pressCount == 50 || pressCount % 100 == 0;
+        // return pressCount == 10 || pressCount == 25 || pressCount == 50 || pressCount % 100 == 0;
+        return pressCount % 10 == 0;
     }
 
     void clearAndDisableBacklight() {
