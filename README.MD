@@ -43,4 +43,3 @@ Making this project as a joke, and to practise some design patterns on embedded 
 - **Setup**: Initializes components, sets up button and observers, and displays initial message.
 - **Loop**: Continuously checks button state and manages LCD backlight based on activity.
 
-![Alt Text](documentation/pictures/diagram.png)
